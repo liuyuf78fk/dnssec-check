@@ -24,33 +24,46 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <uci.h>
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
+#include "config.h"
 
-#define DEFAULT_SECURE_DOMAIN "nic.cz"
-#define DEFAULT_BROKEN_DOMAIN "dnssec-failed.org"
 #define DEFAULT_DIG_PATH "/usr/bin/dig"
-#define DEFAULT_TIME "3"
-#define DEFAULT_TRIES "2"
 
 #define BUF_SIZE 8192
 #define EXIT_SUCCESS           0
 #define EXIT_GENERAL_ERROR     1
 #define EXIT_DIG_NOT_FOUND    127
 
-static int g_debug_enabled = 0;
+static int g_debug_enabled = DEFAULT_DEBUG;
 #define DEBUG_PRINT(fmt, ...) \
     do { if (g_debug_enabled) printf("[DEBUG] " fmt, ##__VA_ARGS__); } while (0)
 
 static char g_dig_path[512] = DEFAULT_DIG_PATH;
+static dnssec_config config = {0};
 
 static void handle_signal(int sig)
 {
-	printf("\n[INFO] Received signal %d, shutting down gracefully...\n",
-	       sig);
-	exit(EXIT_SUCCESS);
+ 	const char prefix[] = "\nReceived signal ";
+    const char suffix[] = ", shutting down gracefully...\n";
+    char num_buf[16];
+    int n = sig;
+    int num_len = 0;
+    do {
+        num_buf[num_len++] = "0123456789"[n % 10];
+        n /= 10;
+    } while (n > 0);
+    for (int i = 0; i < num_len / 2; i++) {
+        char tmp = num_buf[i];
+        num_buf[i] = num_buf[num_len - 1 - i];
+        num_buf[num_len - 1 - i] = tmp;
+    }
+	
+    write(STDOUT_FILENO, prefix, strlen(prefix));
+    write(STDOUT_FILENO, num_buf, num_len);
+    write(STDOUT_FILENO, suffix, strlen(suffix));
+    _exit(EXIT_SUCCESS);
 }
 
 static void setup_signal_handlers()
@@ -108,29 +121,6 @@ static int run_dig(const char *domain, const char *args[], char *output_buf,
 		waitpid(pid, &status, 0);
 		return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 	}
-}
-
-static char *strcasestr(const char *haystack, const char *needle)
-{
-	if (!*needle)
-		return (char *)haystack;
-
-	for (; *haystack; haystack++) {
-		const char *h = haystack;
-		const char *n = needle;
-
-		while (*h && *n
-		       && tolower((unsigned char)*h) ==
-		       tolower((unsigned char)*n)) {
-			h++;
-			n++;
-		}
-
-		if (!*n)
-			return (char *)haystack;
-	}
-
-	return NULL;
 }
 
 static void parse_dig_output(const char *output, int *ad_flag, char *rcode_buf)
@@ -277,103 +267,69 @@ static int find_dig_path(char *buf, size_t buflen)
 	return 0;
 }
 
-static int load_uci_config(char *secure_dom, size_t len1, char *broken_dom,
-			   size_t len2, char *t, size_t tlen, char *tr,
-			   size_t trlen)
-{
-	struct uci_context *ctx = uci_alloc_context();
-	struct uci_package *pkg = NULL;
-	struct uci_section *section;
-	struct uci_element *e;
-
-	if (!ctx || uci_load(ctx, "dnssec-check", &pkg) != UCI_OK) {
-		uci_free_context(ctx);
-		return 0;
-	}
-
-	uci_foreach_element(&pkg->sections, e) {
-		section = uci_to_section(e);
-		if (strcmp(section->type, "settings") == 0) {
-			uci_foreach_element(&section->options, e) {
-				struct uci_option *o = uci_to_option(e);
-				if (strcmp(e->name, "secure-domain") == 0)
-					strncpy(secure_dom, o->v.string,
-						len1 - 1);
-				else if (strcmp(e->name, "broken-domain") == 0)
-					strncpy(broken_dom, o->v.string,
-						len2 - 1);
-				else if (strcmp(e->name, "dig-time") == 0)
-					strncpy(t, o->v.string, tlen - 1);
-				else if (strcmp(e->name, "dig-tries") == 0)
-					strncpy(tr, o->v.string, trlen - 1);
-				else if (strcmp(e->name, "debug") == 0) {
-					if (strcmp(o->v.string, "1") == 0)
-						g_debug_enabled = 1;
-				}
-			}
-			break;
-		}
-	}
-
-	uci_unload(ctx, pkg);
-	uci_free_context(ctx);
-	return 1;
-}
-
 int main(void)
 {
+	int exit_code = EXIT_GENERAL_ERROR;
 	setup_signal_handlers();
 
-	char secure_domain[128] = DEFAULT_SECURE_DOMAIN;
-	char broken_domain[128] = DEFAULT_BROKEN_DOMAIN;
-	char dig_time[16] = DEFAULT_TIME;
-	char dig_tries[16] = DEFAULT_TRIES;
-
-	if (!load_uci_config
-	    (secure_domain, sizeof(secure_domain), broken_domain,
-	     sizeof(broken_domain), dig_time, sizeof(dig_time), dig_tries,
-	     sizeof(dig_tries))) {
-		printf("[INFO] Using default configuration.\n");
+	if ( load_config(&config) < 0 ) {
+		printf("Using default configuration.\n");
 	} else {
-		printf("[INFO] Loaded configuration from UCI.\n");
+		printf("Loaded configuration from %s\n",CONF_FILE_PATH);
+		g_debug_enabled = config.debug;
+		DEBUG_PRINT(" secure_domain = %s\n", config.secure_domain);
+		DEBUG_PRINT(" broken_domain = %s\n", config.broken_domain);
+		DEBUG_PRINT(" dig_time = %s\n", config.dig_time);
+		DEBUG_PRINT(" dig_tries = %s\n", config.dig_tries);
+		DEBUG_PRINT(" debug = %d\n", config.debug);
 	}
 
 	char time_arg[32], tries_arg[32];
-	snprintf(time_arg, sizeof(time_arg), "+time=%s", dig_time);
-	snprintf(tries_arg, sizeof(tries_arg), "+tries=%s", dig_tries);
+	snprintf(time_arg, sizeof(time_arg), "+time=%s", config.dig_time);
+	snprintf(tries_arg, sizeof(tries_arg), "+tries=%s", config.dig_tries);
 	const char *dig_args[] =
 	    { "+dnssec", time_arg, tries_arg, "+multi", NULL };
 
 	if (!find_dig_path(g_dig_path, sizeof(g_dig_path))) {
 		fprintf(stderr, "dig not found in PATH\n");
-		exit(EXIT_DIG_NOT_FOUND);
+		exit_code = EXIT_DIG_NOT_FOUND;
+		goto err;
 	}
 
-	printf("[*] Querying %s ...\n", secure_domain);
+	printf("[*] Querying %s ...\n", config.secure_domain);
 	int secure_ad = 0;
 	char rcode_secure[32] = { 0 }, error[256] = { 0 };
 	int secure_query_result =
-	    query_domain(secure_domain, dig_args, &secure_ad, rcode_secure,
+	    query_domain(config.secure_domain, dig_args, &secure_ad, rcode_secure,
 			 error);
 	if (!secure_query_result)
 		fprintf(stderr, "[ERROR] Failed to query %s: %s\n",
-			secure_domain, error);
+			config.secure_domain, error);
 
-	printf("[*] Querying %s ...\n", broken_domain);
+	printf("[*] Querying %s ...\n", config.broken_domain);
 	int broken_ad = 0;
 	char rcode_broken[32] = { 0 };
 	int broken_query_result =
-	    query_domain(broken_domain, dig_args, &broken_ad, rcode_broken,
+	    query_domain(config.broken_domain, dig_args, &broken_ad, rcode_broken,
 			 error);
 	if (!broken_query_result)
 		fprintf(stderr, "[ERROR] Failed to query %s: %s\n",
-			broken_domain, error);
+			config.broken_domain, error);
 
 	if (!secure_query_result || !broken_query_result) {
-		exit(EXIT_GENERAL_ERROR);
+		exit_code = EXIT_GENERAL_ERROR;
+		goto err;
 	}
 
-	determine_result(secure_domain, secure_ad, rcode_secure,
-			 broken_domain, broken_ad, rcode_broken);
-	return 0;
+	determine_result(config.secure_domain, secure_ad, rcode_secure,
+			 config.broken_domain, broken_ad, rcode_broken);
+
+	exit_code = EXIT_SUCCESS;
+
+err:
+    if (config.secure_domain) free((void*)config.secure_domain);
+    if (config.broken_domain) free((void*)config.broken_domain);
+	if (config.dig_time) free((void*)config.dig_time);
+	if (config.dig_tries) free((void*)config.dig_tries);
+	return exit_code;	
 }
