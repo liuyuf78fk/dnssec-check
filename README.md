@@ -66,10 +66,10 @@ Explanation: The local resolver successfully performs full DNSSEC validation.
 /etc/resolv.conf:
 
 ```
-nameserver 127.0.0.1
+nameserver 127.0.0.1 #(DNSSEC not enabled)
 ```
 
-network.wan.dns (UCI):
+If the upstream DNS server is:
 
 ```
 1.1.1.1
@@ -94,13 +94,13 @@ Explanation: The local resolver does not validate DNSSEC, but the upstream resol
 /etc/resolv.conf:
 
 ```
-nameserver 127.0.0.1
+nameserver 127.0.0.1 #(DNSSEC not enabled)
 ```
 
-network.wan.dns (UCI):
+If the upstream DNS server is:
 
 ```
-192.168.137.1
+192.168.137.1 #(DNSSEC not enabled)
 ```
 
 Command:
