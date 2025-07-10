@@ -48,9 +48,25 @@ static char g_dig_path[512] = DEFAULT_DIG_PATH;
 
 static void handle_signal(int sig)
 {
-	printf("\n[INFO] Received signal %d, shutting down gracefully...\n",
-	       sig);
-	exit(EXIT_SUCCESS);
+	const char prefix[] = "\nReceived signal ";
+	const char suffix[] = ", shutting down gracefully...\n";
+	char num_buf[16];
+	int n = sig;
+	int num_len = 0;
+	do {
+		num_buf[num_len++] = "0123456789"[n % 10];
+		n /= 10;
+	} while (n > 0);
+	for (int i = 0; i < num_len / 2; i++) {
+		char tmp = num_buf[i];
+		num_buf[i] = num_buf[num_len - 1 - i];
+		num_buf[num_len - 1 - i] = tmp;
+	}
+
+	write(STDOUT_FILENO, prefix, strlen(prefix));
+	write(STDOUT_FILENO, num_buf, num_len);
+	write(STDOUT_FILENO, suffix, strlen(suffix));
+	_exit(EXIT_SUCCESS);
 }
 
 static void setup_signal_handlers()
@@ -277,47 +293,117 @@ static int find_dig_path(char *buf, size_t buflen)
 	return 0;
 }
 
-static int load_uci_config(char *secure_dom, size_t len1, char *broken_dom,
-			   size_t len2, char *t, size_t tlen, char *tr,
-			   size_t trlen)
+static int load_uci_config(char *secure_domain_buffer,
+			   size_t secure_domain_buffer_size,
+			   char *broken_domain_buffer,
+			   size_t broken_domain_buffer_size,
+			   char *dig_time_buffer, size_t dig_time_buffer_size,
+			   char *dig_tries_buffer, size_t dig_tries_buffer_size)
 {
-	struct uci_context *ctx = uci_alloc_context();
-	struct uci_package *pkg = NULL;
-	struct uci_section *section;
-	struct uci_element *e;
-
-	if (!ctx || uci_load(ctx, "dnssec-check", &pkg) != UCI_OK) {
-		uci_free_context(ctx);
-		return 0;
+	struct uci_element *current_element;
+	if (!secure_domain_buffer || !broken_domain_buffer ||
+	    !dig_time_buffer || !dig_tries_buffer ||
+	    secure_domain_buffer_size <= 1 || broken_domain_buffer_size <= 1 ||
+	    dig_time_buffer_size <= 1 || dig_tries_buffer_size <= 1) {
+		return -1;
 	}
 
-	uci_foreach_element(&pkg->sections, e) {
-		section = uci_to_section(e);
-		if (strcmp(section->type, "settings") == 0) {
-			uci_foreach_element(&section->options, e) {
-				struct uci_option *o = uci_to_option(e);
-				if (strcmp(e->name, "secure-domain") == 0)
-					strncpy(secure_dom, o->v.string,
-						len1 - 1);
-				else if (strcmp(e->name, "broken-domain") == 0)
-					strncpy(broken_dom, o->v.string,
-						len2 - 1);
-				else if (strcmp(e->name, "dig-time") == 0)
-					strncpy(t, o->v.string, tlen - 1);
-				else if (strcmp(e->name, "dig-tries") == 0)
-					strncpy(tr, o->v.string, trlen - 1);
-				else if (strcmp(e->name, "debug") == 0) {
-					if (strcmp(o->v.string, "1") == 0)
+	secure_domain_buffer[0] = broken_domain_buffer[0] =
+	    dig_time_buffer[0] = dig_tries_buffer[0] = '\0';
+	char debug_buffer[2] = { '\0' };
+
+	struct uci_context *uci_context = uci_alloc_context();
+	if (!uci_context)
+		return -1;
+
+	struct uci_package *uci_package = NULL;
+	if (uci_load(uci_context, "dnssec-check", &uci_package) != UCI_OK) {
+		uci_free_context(uci_context);
+		return -1;
+	}
+
+	int load_status = -1;
+	uci_foreach_element(&uci_package->sections, current_element) {
+		struct uci_section *config_section =
+		    uci_to_section(current_element);
+		if (strcmp(config_section->type, "settings") == 0) {
+			uci_foreach_element(&config_section->options,
+					    current_element) {
+				struct uci_option *config_option =
+				    uci_to_option(current_element);
+				if (config_option->type != UCI_TYPE_STRING)
+					continue;
+
+				const char *option_value =
+				    config_option->v.string;
+				if (strcmp
+				    (current_element->name,
+				     "secure_domain") == 0) {
+					strncpy(secure_domain_buffer,
+						option_value,
+						secure_domain_buffer_size - 1);
+					secure_domain_buffer
+					    [secure_domain_buffer_size - 1] =
+					    '\0';
+				} else
+				    if (strcmp
+					(current_element->name,
+					 "broken_domain") == 0) {
+					strncpy(broken_domain_buffer,
+						option_value,
+						broken_domain_buffer_size - 1);
+					broken_domain_buffer
+					    [broken_domain_buffer_size - 1] =
+					    '\0';
+				} else
+				    if (strcmp
+					(current_element->name,
+					 "dig_time") == 0) {
+					strncpy(dig_time_buffer, option_value,
+						dig_time_buffer_size - 1);
+					dig_time_buffer[dig_time_buffer_size -
+							1] = '\0';
+				} else
+				    if (strcmp
+					(current_element->name,
+					 "dig_tries") == 0) {
+					strncpy(dig_tries_buffer, option_value,
+						dig_tries_buffer_size - 1);
+					dig_tries_buffer[dig_tries_buffer_size -
+							 1] = '\0';
+				} else
+				    if (strcmp(current_element->name, "debug")
+					== 0) {
+					debug_buffer[0] = option_value[0];
+					debug_buffer[1] = '\0';
+					if (strcmp(option_value, "1") == 0) {
 						g_debug_enabled = 1;
+					} else if (strcmp(option_value, "0") ==
+						   0) {
+						g_debug_enabled = 0;
+					} else {
+						uci_unload(uci_context,
+							   uci_package);
+						uci_free_context(uci_context);
+						return load_status;
+					}
 				}
 			}
+			load_status = 0;
 			break;
 		}
 	}
 
-	uci_unload(ctx, pkg);
-	uci_free_context(ctx);
-	return 1;
+	uci_unload(uci_context, uci_package);
+	uci_free_context(uci_context);
+
+	if (load_status == 0) {
+		DEBUG_PRINT
+		    ("Config loaded: secure='%s', broken='%s', time='%s', tries='%s' debug='%s'\n",
+		     secure_domain_buffer, broken_domain_buffer,
+		     dig_time_buffer, dig_tries_buffer, debug_buffer);
+	}
+	return load_status;
 }
 
 int main(void)
@@ -329,10 +415,10 @@ int main(void)
 	char dig_time[16] = DEFAULT_TIME;
 	char dig_tries[16] = DEFAULT_TRIES;
 
-	if (!load_uci_config
+	if (load_uci_config
 	    (secure_domain, sizeof(secure_domain), broken_domain,
 	     sizeof(broken_domain), dig_time, sizeof(dig_time), dig_tries,
-	     sizeof(dig_tries))) {
+	     sizeof(dig_tries)) < 0) {
 		printf("[INFO] Using default configuration.\n");
 	} else {
 		printf("[INFO] Loaded configuration from UCI.\n");
@@ -370,10 +456,10 @@ int main(void)
 			broken_domain, error);
 
 	if (!secure_query_result || !broken_query_result) {
-		exit(EXIT_GENERAL_ERROR);
+		return EXIT_GENERAL_ERROR;
 	}
 
 	determine_result(secure_domain, secure_ad, rcode_secure,
 			 broken_domain, broken_ad, rcode_broken);
-	return 0;
+	return EXIT_SUCCESS;
 }
