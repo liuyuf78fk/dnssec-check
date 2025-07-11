@@ -1,6 +1,6 @@
 # dnssec-check
 
-This is a lightweight tool for testing DNSSEC support on OpenWrt systems.
+This is a lightweight tool for testing DNSSEC support on Linux systems.
 It uses `dig` to query two reference domains and evaluates the DNS resolver's DNSSEC validation capabilities.
 
 ## Features
