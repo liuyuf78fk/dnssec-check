@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: dnssec-check
+Source: https://github.com/liuyuf78fk/dnssec-check
+
+Files: *
+Copyright: 2025 Liu Yu <f78fk@live.com>
+License: GPL-2+
+
+Files: src/inih/*
+Copyright: 2009-2020, Ben Hoyt
+License: BSD-3-Clause
+

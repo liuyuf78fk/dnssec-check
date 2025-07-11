@@ -1,0 +1,3 @@
+dnssec-check-dbgsym_1.0.0_amd64.ddeb debug optional automatic=yes
+dnssec-check_1.0.0_amd64.buildinfo net optional
+dnssec-check_1.0.0_amd64.deb net optional

@@ -1,0 +1,3 @@
+dnssec-check usr/bin
+etc/dnssec-check/dnssec-check.conf etc/dnssec-check/
+debian/manpages/dnssec-check.1 usr/share/man/man1/
