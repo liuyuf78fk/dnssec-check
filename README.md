@@ -1,27 +1,31 @@
-# dnssec-check (OpenWrt version)
+# dnssec-check
 
 This is a lightweight tool for testing DNSSEC support on OpenWrt systems.
 It uses `dig` to query two reference domains and evaluates the DNS resolver's DNSSEC validation capabilities.
 
 ## Features
 
-- Designed for OpenWrt
-- Uses `libuci` to read configuration from `/etc/config/dnssec-check`
+- Compatible with both Debian and OpenWrt 
+- Uses `inih` to read configuration from `/etc/dnssec-check/dnssec-check.conf`
 - Performs DNS queries via `dig`
 - Evaluates DNSSEC support level: secure, medium, or insecure
-- Minimal dependencies: bind-dig, libuci
+- Minimal dependencies: `bind9-dnsutils` on Debian, `bind-dig` on OpenWrt
 
-## UCI Configuration
+## INI Configuration
 
-File: `/etc/config/dnssec-check`
+File: `/etc/dnssec-check/dnssec-check.conf`
 
 ```
-config settings 'main'
-    option secure_domain 'nic.cz'
-    option broken_domain 'dnssec-failed.org'
-    option dig_time '3'
-    option dig_tries '2'
-    option debug '0'
+[domains]
+secure_domain = nic.cz
+broken_domain = dnssec-failed.org
+
+[query]
+dig_time = 3
+dig_tries = 2
+
+[output]
+debug = 0
 ```
 
 ## Logic Summary
@@ -125,6 +129,7 @@ The tool accurately detects DNSSEC capabilities across three levels:
 - medium: upstream DNSSEC validation is active, but local is not
 - insecure: no DNSSEC validation at all
 
-This tool might assist OpenWrt users with elementary DNSSEC validation.
+## Third-party components
 
-
+This project includes the [inih](https://github.com/benhoyt/inih) library by Ben Hoyt,
+which is licensed under the New BSD License. See [inih-LICENSE.txt](inih/inih-LICENSE.txt) for details.
