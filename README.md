@@ -9,7 +9,7 @@ It uses `dig` to query two reference domains and evaluates the DNS resolver's DN
 - Uses `inih` to read configuration from `/etc/dnssec-check/dnssec-check.conf`
 - Performs DNS queries via `dig`
 - Evaluates DNSSEC support level: secure, medium, or insecure
-- Minimal dependencies: dnsutils
+- Minimal dependencies: bind9-dnsutils
 
 ## INI Configuration
 
