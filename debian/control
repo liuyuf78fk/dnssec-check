@@ -8,8 +8,9 @@ Homepage: https://github.com/liuyuf78fk/dnssec-check
 
 Package: dnssec-check
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, bind9-dnsutils
 Description: Simple DNSSEC validation tool
- Checks whether the system's DNS resolution path properly supports DNSSEC validation.
- Reports DNSSEC support level as secure, medium, or insecure based on resolver behavior.
+ Checks whether the system's DNS resolution path properly supports
+ DNSSEC validation and reports the support level as secure,
+ medium, or insecure.
 
