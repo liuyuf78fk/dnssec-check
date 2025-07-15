@@ -1,0 +1,5 @@
+dnssec-check (1.0.0) unstable; urgency=medium
+
+  * First unstable release.
+
+ -- Liu Yu <f78fk@live.com>  Fri, 11 Jul 2025 11:37:00 +0900

@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	gcc -g -o dnssec-check src/dnssec-check.c src/config.c src/inih/ini.c -I src -I src/inih
+
+override_dh_auto_install:
+	install -d debian/dnssec-check/usr/bin
+	install -m 0755 dnssec-check debian/dnssec-check/usr/bin/
+
+	install -d debian/dnssec-check/etc/dnssec-check
+	install -m 0644 etc/dnssec-check/dnssec-check.conf debian/dnssec-check/etc/dnssec-check/

@@ -1,0 +1,12 @@
+debian/dnssec-check/
+debian/.debhelper/
+debian/*.debhelper-*
+debian/*.debhelper
+debian/*.buildinfo
+debian/*.changes
+debian/*.deb
+debian/*.ddeb
+debian/*.tar.*
+debian/files
+dnssec-check
+

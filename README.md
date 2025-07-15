@@ -132,4 +132,4 @@ The tool accurately detects DNSSEC capabilities across three levels:
 ## Third-party components
 
 This project includes the [inih](https://github.com/benhoyt/inih) library by Ben Hoyt,
-which is licensed under the New BSD License. See [inih-LICENSE.txt](inih/inih-LICENSE.txt) for details.
+which is licensed under the New BSD License. See [inih-LICENSE.txt](src/inih/inih-LICENSE.txt) for details.

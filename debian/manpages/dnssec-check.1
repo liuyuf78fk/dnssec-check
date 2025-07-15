@@ -1,0 +1,48 @@
+.TH dnssec-check 1 "2025-07-11" "dnssec-check 1.0.0" "User Commands"
+.SH NAME
+dnssec-check \- simple DNSSEC validation tool
+
+.SH SYNOPSIS
+.B dnssec-check
+.RI [ options ]
+
+.SH DESCRIPTION
+dnssec-check is a tool to verify whether the system's DNS resolution path
+properly supports DNSSEC validation.
+
+It queries DNS servers and reports the DNSSEC validation status,
+indicating if the resolver behaves securely.
+
+.SH OPTIONS
+.TP
+None currently. Just run the command.
+
+.SH EXAMPLES
+Run dnssec-check:
+
+.IP
+$ dnssec-check
+
+Sample output:
+
+.IP
+Loaded configuration from /etc/dnssec-check/dnssec-check.conf
+.br
+[*] Querying nic.cz ...
+.br
+[*] Querying dnssec-failed.org ...
+.br
+Parsed nic.cz: AD=true, Status=NOERROR
+.br
+Parsed dnssec-failed.org: AD=false, Status=SERVFAIL
+.br
+ -> Severity level: secure
+
+.SH CONFIGURATION
+Reads configuration from /etc/dnssec-check/dnssec-check.conf
+
+.SH AUTHOR
+Written and maintained by Liu Yu <f78fk@live.com>.
+
+.SH COPYRIGHT
+Licensed under the GNU General Public License v2.0 or later.
