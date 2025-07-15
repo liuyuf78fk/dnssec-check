@@ -134,4 +134,4 @@ This tool might assist Debian users with elementary DNSSEC validation.
 ## Third-party components
 
 This project includes the [inih](https://github.com/benhoyt/inih) library by Ben Hoyt,
-which is licensed under the New BSD License. See [inih-LICENSE.txt](inih/inih-LICENSE.txt) for details.
+which is licensed under the New BSD License. See [inih-LICENSE.txt](src/inih/inih-LICENSE.txt) for details.
