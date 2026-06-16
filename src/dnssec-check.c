@@ -39,6 +39,8 @@
 static int g_debug_enabled = DEFAULT_DEBUG;
 #define VERSION "1.0.3"
 
+static int g_debug_enabled = 0;
+>>>>>>> e240349 (feat: add -v and --version flags to output version info):dnssec-check.c
 #define DEBUG_PRINT(fmt, ...) \
     do { if (g_debug_enabled) printf("[DEBUG] " fmt, ##__VA_ARGS__); } while (0)
 
@@ -272,9 +274,125 @@ static int find_dig_path(char *buf, size_t buflen)
 	return 0;
 }
 
-int main(void)
+static int load_uci_config(char *secure_domain_buffer,
+			   size_t secure_domain_buffer_size,
+			   char *broken_domain_buffer,
+			   size_t broken_domain_buffer_size,
+			   char *dig_time_buffer, size_t dig_time_buffer_size,
+			   char *dig_tries_buffer, size_t dig_tries_buffer_size)
 {
-	int exit_code = EXIT_GENERAL_ERROR;
+	struct uci_element *current_element;
+	if (!secure_domain_buffer || !broken_domain_buffer ||
+	    !dig_time_buffer || !dig_tries_buffer ||
+	    secure_domain_buffer_size <= 1 || broken_domain_buffer_size <= 1 ||
+	    dig_time_buffer_size <= 1 || dig_tries_buffer_size <= 1) {
+		return -1;
+	}
+
+	secure_domain_buffer[0] = broken_domain_buffer[0] =
+	    dig_time_buffer[0] = dig_tries_buffer[0] = '\0';
+	char debug_buffer[2] = { '\0' };
+
+	struct uci_context *uci_context = uci_alloc_context();
+	if (!uci_context)
+		return -1;
+
+	struct uci_package *uci_package = NULL;
+	if (uci_load(uci_context, "dnssec-check", &uci_package) != UCI_OK) {
+		uci_free_context(uci_context);
+		return -1;
+	}
+
+	int load_status = -1;
+	uci_foreach_element(&uci_package->sections, current_element) {
+		struct uci_section *config_section =
+		    uci_to_section(current_element);
+		if (strcmp(config_section->type, "settings") == 0) {
+			uci_foreach_element(&config_section->options,
+					    current_element) {
+				struct uci_option *config_option =
+				    uci_to_option(current_element);
+				if (config_option->type != UCI_TYPE_STRING)
+					continue;
+
+				const char *option_value =
+				    config_option->v.string;
+				if (strcmp
+				    (current_element->name,
+				     "secure_domain") == 0) {
+					strncpy(secure_domain_buffer,
+						option_value,
+						secure_domain_buffer_size - 1);
+					secure_domain_buffer
+					    [secure_domain_buffer_size - 1] =
+					    '\0';
+				} else
+				    if (strcmp
+					(current_element->name,
+					 "broken_domain") == 0) {
+					strncpy(broken_domain_buffer,
+						option_value,
+						broken_domain_buffer_size - 1);
+					broken_domain_buffer
+					    [broken_domain_buffer_size - 1] =
+					    '\0';
+				} else
+				    if (strcmp
+					(current_element->name,
+					 "dig_time") == 0) {
+					strncpy(dig_time_buffer, option_value,
+						dig_time_buffer_size - 1);
+					dig_time_buffer[dig_time_buffer_size -
+							1] = '\0';
+				} else
+				    if (strcmp
+					(current_element->name,
+					 "dig_tries") == 0) {
+					strncpy(dig_tries_buffer, option_value,
+						dig_tries_buffer_size - 1);
+					dig_tries_buffer[dig_tries_buffer_size -
+							 1] = '\0';
+				} else
+				    if (strcmp(current_element->name, "debug")
+					== 0) {
+					debug_buffer[0] = option_value[0];
+					debug_buffer[1] = '\0';
+					if (strcmp(option_value, "1") == 0) {
+						g_debug_enabled = 1;
+					} else if (strcmp(option_value, "0") ==
+						   0) {
+						g_debug_enabled = 0;
+					} else {
+						uci_unload(uci_context,
+							   uci_package);
+						uci_free_context(uci_context);
+						return load_status;
+					}
+				}
+			}
+			load_status = 0;
+			break;
+		}
+	}
+
+	uci_unload(uci_context, uci_package);
+	uci_free_context(uci_context);
+
+	if (load_status == 0) {
+		DEBUG_PRINT
+		    ("Config loaded: secure='%s', broken='%s', time='%s', tries='%s' debug='%s'\n",
+		     secure_domain_buffer, broken_domain_buffer,
+		     dig_time_buffer, dig_tries_buffer, debug_buffer);
+	}
+	return load_status;
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc > 1 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
+		printf("%s\n", VERSION);
+		return EXIT_SUCCESS;
+	}
 	setup_signal_handlers();
 
 	if ( load_config(&config) < 0 ) {
