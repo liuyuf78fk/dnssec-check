@@ -40,6 +40,8 @@
 #define EXIT_GENERAL_ERROR     1
 #define EXIT_DIG_NOT_FOUND    127
 
+#define VERSION "1.0.2"
+
 static int g_debug_enabled = 0;
 #define DEBUG_PRINT(fmt, ...) \
     do { if (g_debug_enabled) printf("[DEBUG] " fmt, ##__VA_ARGS__); } while (0)
@@ -406,8 +408,12 @@ static int load_uci_config(char *secure_domain_buffer,
 	return load_status;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+	if (argc > 1 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
+		printf("%s\n", VERSION);
+		return EXIT_SUCCESS;
+	}
 	setup_signal_handlers();
 
 	char secure_domain[128] = DEFAULT_SECURE_DOMAIN;
