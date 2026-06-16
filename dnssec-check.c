@@ -388,8 +388,12 @@ static int load_uci_config(char *secure_domain_buffer,
 	return load_status;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+	if (argc > 1 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
+		printf("%s\n", VERSION);
+		return EXIT_SUCCESS;
+	}
 	setup_signal_handlers();
 
 	char secure_domain[128] = DEFAULT_SECURE_DOMAIN;
