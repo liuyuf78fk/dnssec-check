@@ -1,6 +1,8 @@
+
 config settings 'main'
-        option secure_domain 'nic.cz'
-        option broken_domain 'dnssec-failed.org'
-        option dig_time '5'
-        option dig_tries '3'
-        option debug '0'
+	option secure_domain 'nic.cz'
+	option broken_domain 'dnssec-failed.org'
+	option dig_time '5'
+	option dig_tries '3'
+	option debug '0'
+
