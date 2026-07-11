@@ -40,13 +40,17 @@
 #define EXIT_GENERAL_ERROR     1
 #define EXIT_DIG_NOT_FOUND    127
 
-#define VERSION "1.0.2"
+#define VERSION "1.0.3"
 
 static int g_debug_enabled = 0;
 #define DEBUG_PRINT(fmt, ...) \
     do { if (g_debug_enabled) printf("[DEBUG] " fmt, ##__VA_ARGS__); } while (0)
 
 static char g_dig_path[512] = DEFAULT_DIG_PATH;
+
+static const char *TRUSTED_DIRS[] = {
+	"/usr/bin", "/usr/sbin", "/bin", "/sbin", NULL
+};
 
 static void handle_signal(int sig)
 {
@@ -78,7 +82,7 @@ static void setup_signal_handlers()
 }
 
 static int run_dig(const char *domain, const char *args[], char *output_buf,
-		   size_t buf_size, char *err_buf)
+		   size_t buf_size)
 {
 	int pipe_fd[2];
 	if (pipe(pipe_fd) == -1)
@@ -126,29 +130,6 @@ static int run_dig(const char *domain, const char *args[], char *output_buf,
 		waitpid(pid, &status, 0);
 		return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 	}
-}
-
-static char *strcasestr(const char *haystack, const char *needle)
-{
-	if (!*needle)
-		return (char *)haystack;
-
-	for (; *haystack; haystack++) {
-		const char *h = haystack;
-		const char *n = needle;
-
-		while (*h && *n
-		       && tolower((unsigned char)*h) ==
-		       tolower((unsigned char)*n)) {
-			h++;
-			n++;
-		}
-
-		if (!*n)
-			return (char *)haystack;
-	}
-
-	return NULL;
 }
 
 static void parse_dig_output(const char *output, int *ad_flag, char *rcode_buf)
@@ -227,11 +208,10 @@ static int query_domain(const char *domain, const char *args[], int *ad_flag,
 			char *rcode, char *error_out)
 {
 	char output[BUF_SIZE] = { 0 };
-	char error[256] = { 0 };
 
-	if (!run_dig(domain, args, output, sizeof(output), error)) {
+	if (!run_dig(domain, args, output, sizeof(output))) {
 		snprintf(error_out, 256, "%s",
-			 error[0] ? error : "dig execution failed");
+			 output[0] ? output : "dig execution failed");
 		return 0;
 	}
 
@@ -274,24 +254,24 @@ static void determine_result(const char *secure_domain, int secure_ad,
 
 static int find_dig_path(char *buf, size_t buflen)
 {
-	char *path_env = getenv("PATH");
-	if (!path_env)
-		return 0;
+	if (access(DEFAULT_DIG_PATH, X_OK) == 0) {
+		strncpy(buf, DEFAULT_DIG_PATH, buflen - 1);
+		buf[buflen - 1] = '\0';
+		return 1;
+	}
 
-	char *paths = strdup(path_env);
-	char *dir = strtok(paths, ":");
-	while (dir) {
+	for (int i = 0; TRUSTED_DIRS[i] != NULL; i++) {
 		char fullpath[512];
-		snprintf(fullpath, sizeof(fullpath), "%s/dig", dir);
+		int n = snprintf(fullpath, sizeof(fullpath), "%s/dig",
+				  TRUSTED_DIRS[i]);
+		if (n < 0 || (size_t)n >= sizeof(fullpath))
+			continue;
 		if (access(fullpath, X_OK) == 0) {
 			strncpy(buf, fullpath, buflen - 1);
 			buf[buflen - 1] = '\0';
-			free(paths);
 			return 1;
 		}
-		dir = strtok(NULL, ":");
 	}
-	free(paths);
 	return 0;
 }
 
