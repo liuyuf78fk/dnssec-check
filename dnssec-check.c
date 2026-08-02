@@ -21,13 +21,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <uci.h>
-#include <ctype.h>
-#include <string.h>
-#include <strings.h>
 
 #define DEFAULT_SECURE_DOMAIN "nic.cz"
 #define DEFAULT_BROKEN_DOMAIN "dnssec-failed.org"
@@ -51,35 +47,6 @@ static char g_dig_path[512] = DEFAULT_DIG_PATH;
 static const char *TRUSTED_DIRS[] = {
 	"/usr/bin", "/usr/sbin", "/bin", "/sbin", NULL
 };
-
-static void handle_signal(int sig)
-{
-	const char prefix[] = "\nReceived signal ";
-	const char suffix[] = ", shutting down gracefully...\n";
-	char num_buf[16];
-	int n = sig;
-	int num_len = 0;
-	do {
-		num_buf[num_len++] = "0123456789"[n % 10];
-		n /= 10;
-	} while (n > 0);
-	for (int i = 0; i < num_len / 2; i++) {
-		char tmp = num_buf[i];
-		num_buf[i] = num_buf[num_len - 1 - i];
-		num_buf[num_len - 1 - i] = tmp;
-	}
-
-	write(STDOUT_FILENO, prefix, strlen(prefix));
-	write(STDOUT_FILENO, num_buf, num_len);
-	write(STDOUT_FILENO, suffix, strlen(suffix));
-	_exit(EXIT_SUCCESS);
-}
-
-static void setup_signal_handlers()
-{
-	signal(SIGINT, handle_signal);
-	signal(SIGTERM, handle_signal);
-}
 
 static int run_dig(const char *domain, const char *args[], char *output_buf,
 		   size_t buf_size)
@@ -135,7 +102,7 @@ static int run_dig(const char *domain, const char *args[], char *output_buf,
 static void parse_dig_output(const char *output, int *ad_flag, char *rcode_buf)
 {
 	*ad_flag = 0;
-	strcpy(rcode_buf, "UNKNOWN");
+	snprintf(rcode_buf, 32, "UNKNOWN");
 
 	char *copy = strdup(output);
 	if (!copy) {
@@ -394,7 +361,6 @@ int main(int argc, char *argv[])
 		printf("%s\n", VERSION);
 		return EXIT_SUCCESS;
 	}
-	setup_signal_handlers();
 
 	char secure_domain[128] = DEFAULT_SECURE_DOMAIN;
 	char broken_domain[128] = DEFAULT_BROKEN_DOMAIN;
